@@ -62,36 +62,57 @@ class FloorplanGraphDataset(Dataset):
     def __init__(self, data, train):
         self.data = data
         self.train = train
+        self.image_shape = (256, 256)
         self.transform = transforms.Normalize(mean=[0.5], std=[0.5])
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
-        raise NotImplementedError
+        floorplan = self.data[index]
 
+        rooms_type = floorplan[0]
+        rooms_bbs = floorplan[1]  # bounding boxes
 
+        if self.train:
+            rooms_bbs_augmented = []  # list(map(self.augment_bounding_box, rooms_bbs))
+            for bb in rooms_bbs:
+                bb_augmented = self.augment_bounding_box(bb)
+                rooms_bbs_augmented.append(bb_augmented)
+            rooms_bbs = rooms_bbs_augmented
 
+        rooms_bbs = np.stack(rooms_bbs)
 
+    def augment_bounding_box(self, bb):
+        angle = random.randint(0, 3) * 90.0
+        flip = random.randint(0, 1) == 1
 
+        angle_rad = np.deg2rad(angle)
+        x0, y0 = self.flip_and_rotate(np.array([bb[0], bb[1]]), flip, angle_rad)
+        x1, y1 = self.flip_and_rotate(np.array([bb[2], bb[3]]), flip, angle_rad)
 
+        xmin, ymin = min(x0, x1), min(y0, y1)
+        xmax, ymax = max(x0, x1), max(y0, y1)
 
+        return np.array([xmin, ymin, xmax, ymax]).astype('int')
 
+    def flip_and_rotate(self, vector, flip, angle):
+        image_bounds = np.array(self.image_shape)
+        center = (image_bounds - 1) / 2
 
+        vector = vector - center
+        rot_matrix = np.array([[np.cos(angle), np.sin(angle)],
+                               [- np.sin(angle), np.cos(angle)]])
+        # clockwise rotation by angle rads
+        vector = np.dot(rot_matrix, vector)
+        vector = vector + center
 
+        x, y = vector
 
+        if flip:
+            # mirror around the x = shape/2 line (around the middle of the x dim)
+            mid = image_bounds[0] / 2
+            dist = abs(mid - x)
+            x = mid - dist if x > mid else mid + dist
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        return x, y
