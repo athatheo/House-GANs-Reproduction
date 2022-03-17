@@ -1,7 +1,7 @@
 """ Data loaders
 This file provides:
-  1. A function that creates two data loaders, one for the training set and one for the test set.
-  2. A FloorplanGraphDataset class which wraps torch's Dataset.
+  1. A `create_loaders` function that creates two data loaders, one for the training set and one for the test set.
+  2. A `FloorplanGraphDataset` class which wraps torch's Dataset.
 
 Raw data schema:
   - dataset is a python list of floorplans
@@ -100,6 +100,7 @@ def create_loaders(path, train_batch_size, test_batch_size, loader_threads, n_ro
             continue
 
         # discard small rooms
+        # TODO use del to drop elements from lists?
         types_filtered = []
         bbs_filtered = []
         for t, bb in zip(rooms_types, rooms_bbs):
@@ -145,7 +146,12 @@ class FloorplanGraphDataset(Dataset):
         rooms_bbs = floorplan[1]  # bounding boxes
 
         if self.augment:
-            rooms_bbs = list(map(self.augment_bounding_box, rooms_bbs))
+            angle = random.randint(0, 3) * 90.0
+            flip = random.randint(0, 1) == 1
+            rooms_bbs = [self.augment_bounding_box(bb, angle, flip) for bb in rooms_bbs]
+            # mutate per room or per floorplan for all rooms (like orig)??
+            # can I move angle/flip inside augment_bounding_box then?
+            #rooms_bbs = list(map(self.augment_bounding_box, rooms_bbs))
 
         rooms_bbs = np.stack(rooms_bbs) / IMAGE_SIZE_IN  # "normalize"
 
@@ -184,10 +190,7 @@ class FloorplanGraphDataset(Dataset):
 
         return rooms_mks, nodes, edges
 
-    def augment_bounding_box(self, bb):
-        angle = random.randint(0, 3) * 90.0
-        flip = random.randint(0, 1) == 1
-
+    def augment_bounding_box(self, bb, angle, flip):
         angle_rad = np.deg2rad(angle)
         x0, y0 = self.flip_and_rotate(np.array([bb[0], bb[1]]), flip, angle_rad)
         x1, y1 = self.flip_and_rotate(np.array([bb[2], bb[3]]), flip, angle_rad)
