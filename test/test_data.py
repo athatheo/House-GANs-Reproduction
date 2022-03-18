@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from src.data import FloorplanGraphDataset, floorplan_collate_fn
+from src.data import FloorplanGraphDataset, collate
 
 
 BASE_PATH = abspath(dirname(__file__))
@@ -45,7 +45,7 @@ class TestFloorplanGraphDataset(unittest.TestCase):
         nd_to_sample_expected = torch.load(join(BASE_PATH, f'resources/nd_to_sample1.pt'))
         ed_to_sample_expected = torch.load(join(BASE_PATH, f'resources/ed_to_sample1.pt'))
 
-        loader = DataLoader(self.dataset, batch_size=5, shuffle=False, num_workers=1, collate_fn=floorplan_collate_fn)
+        loader = DataLoader(self.dataset, batch_size=5, shuffle=False, num_workers=1, collate_fn=collate)
 
         batch = next(iter(loader))
         mks, nds, eds, nd_to_sample, ed_to_sample = batch
