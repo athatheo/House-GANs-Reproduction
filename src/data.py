@@ -57,7 +57,7 @@ def floorplan_collate_fn(batch):
     node_offset = 0
 
     for i, (rooms_mks, nodes, edges) in enumerate(batch):
-        O, T = nodes.size[0], edges.size(0)
+        O, T = nodes.size(0), edges.size(0)
 
         all_rooms_mks.append(rooms_mks)
         all_nodes.append(nodes)
