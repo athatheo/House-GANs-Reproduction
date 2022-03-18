@@ -5,31 +5,72 @@ This file provides:
 
 Raw data schema:
   - dataset is a python list of floorplans
-  - each floorplan if a python list containing rooms_type, rooms_bounding_boxes, and 4 other elements (which we drop)
-  - the rooms_type is a list of ints, each signifying the type of each room in the floorplan. The mapping is:
+  - each floorplan if a python list containing rooms_types, rooms_bounding_boxes, and 4 other elements (which we drop)
+  - the rooms_types is a list of ints, each signifying the type of each room in the floorplan. The mapping is:
     ROOM_CLASS = {"living_room": 1, "kitchen": 2, "bedroom": 3, "bathroom": 4, "missing": 5,
     "closet": 6, "balcony": 7, "corridor": 8, "dining_room": 9, "laundry_room": 10}
   - the rooms_bounding_boxes is a list of numpy arrays. Each of these arrays has 4 integer elements.
     The first two correspond to the coordinates of the point to the upper left of the room's box, and the last two
     to the bottom right respectively. The coordinates' values are in the range [0, 256]
   - an example of floorplan is the following:
-    [[6.0, 2.0, 4.0], [array([132,   6, 148,  65]), ..., array([132,  91, 160, 130])], ...]
+    ```
+    [
+        [6.0, 2.0, 4.0],
+        [array([array([132,   6, 148,  65]), array([110,  68, 208, 130]), array([132,  91, 160, 130])],
+        ...(the rest are dropped)
+    ]
+    ```
 
 Transformations that the data undergo sequentially:
   1. malformed data are dropped
   2. (very) small rooms are dropped
   3. if the set is for training, the floorplans are augmented, that is, the bounding boxes of the rooms are randomly
      flipped and rotated.
-  4. data are scaled to 0-1 range
+  4. the bounding boxes are scaled to 0-1 range
   5. the bounding box of each room is moved so that its center is identical to the center of the image
-  6. a graph is created. the nodes are the rooms, the edges are tuples of 3 elements
-  # TODO finish this
+  6. a graph is created:
+    1. the nodes are the rooms
+    2. the edges are tuples of 3 elements
+  7. the images are created, by rescaling and the bounding boxes and then using them to create 32x32 arrays containing
+    -1 and 1 in the places of those bounding boxes of the rooms (-1: no room area, 1: room area)
 
 Output schema:
-  Each FloorplanGraphDataset access returns: a LongTensor of shape (n_rooms, 32, 32), 32 being the dimension of the
-  output image (showing the bounding box for each room), a LongTensor of shape (n_rooms, 10) which is the
-  onehot encoding of the room types, and a FloatTensor of (n_edges, 3), denoting the relationships between the rooms.
-  # TODO elaborate on the image etc
+  Each FloorplanGraphDataset access (__getitem__ or []) returns:
+    1. a FloatTensor (why floats?) of shape (n_rooms, 32, 32), 32 being the dimension of the output image (showing the
+      bounding box for each room),
+    2. a FloatTensor (why floats?) of shape (n_rooms, 10) which is the onehot encoding of the room types,
+    3. and a LongTensor of (n_edges, 3), denoting the relationships between the rooms.
+  Example:
+    For the example given previously:
+    ```
+    [
+        [6.0, 2.0, 4.0],
+        [array([array([132,   6, 148,  65]), array([110,  68, 208, 130]), array([132,  91, 160, 130])],
+        ...(the rest are dropped)
+    ]
+    ```
+    we get the following 3 tensors:
+    1. https://imgur.com/a/HsQkeXg . The 1's are not in the exact locations of the starting bounding boxes because
+      when training, the data undergoes augmentation randomly (random flips and 90deg rotations of the rooms)
+    2. ```
+        tensor([[0., 0., 0., 0., 0., 1., 0., 0., 0., 0.],
+                [0., 1., 0., 0., 0., 0., 0., 0., 0., 0.],
+                [0., 0., 0., 1., 0., 0., 0., 0., 0., 0.]])
+       ```
+    3. ```
+        tensor([[ 0,  1,  1],
+               [ 0, -1,  2],
+               [ 1,  1,  2]])
+       ```
+      The edges tensor (3.) means the following: Room with index 0 (0) is adjacent (1) to room w/ index 1 (1), room with
+      index 0 (0) is not adjacent (-1) to room w/ index 2 (2) etc.
+
+Dataset collation:
+  When the Dataset is loaded in batches, the collation function floorplan_collate_fn is called. This concatenates
+  "vertically" (stacks) all the tensors that __getitem__ returns (so now we get tensors of sum(n_i) sizes,
+  i={1 to batch size} and n_i the number of rooms in each floorplan of the batch, same with edges you get the idea),
+  and also returns two more tensors. __These two tensors are only used when training in parallel__.
+  TODO elabolarate further here.
 """
 
 import random
