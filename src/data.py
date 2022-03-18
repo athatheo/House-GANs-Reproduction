@@ -1,7 +1,7 @@
 """ Data loaders
 This file provides:
   1. A `create_loaders` function that creates two data loaders, one for the training set and one for the test set.
-  2. A `FloorplanGraphDataset` class which wraps torch's Dataset.
+  2. A `FloorplanGraphDataset` class which extends torch's Dataset.
 
 Raw data schema:
   - dataset is a python list of floorplans
@@ -64,7 +64,8 @@ Output schema:
                [ 1,  1,  2]])
        ```
       The edges tensor (3.) means the following: Room with index 0 (0) is adjacent (1) to room w/ index 1 (1), room with
-      index 0 (0) is not adjacent (-1) to room w/ index 2 (2) etc.
+      index 0 (0) is not adjacent (-1) to room w/ index 2 (2) etc. Rooms overlapping in some way are considered
+      adjacent.
 
 Dataset collation:
   When the Dataset is loaded in batches, the collation function floorplan_collate_fn is called. This concatenates
