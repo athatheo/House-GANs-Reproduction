@@ -93,42 +93,39 @@ MIN_W = 0.03
 ADJACENCY_THRESHOLD = 0.03
 
 
-def floorplan_collate_fn(batch):
-    # TODO revisit
-    all_rooms_mks, all_nodes, all_edges = [], [], []
-    all_node_to_sample, all_edge_to_sample = [], []
+def collate(batch):
+    n_rooms_total = sum([len(b[0]) for b in batch])
+    n_edges_total = sum([len(b[2]) for b in batch])
+
+    # preallocate tensors to speed up
+    all_rooms_mks = torch.empty((n_rooms_total, IMAGE_SIZE_OUT, IMAGE_SIZE_OUT), dtype=torch.float)
+    all_nodes = torch.empty((n_rooms_total, 10), dtype=torch.float)
+    all_edges = torch.empty((n_edges_total, 3), dtype=torch.long) if n_edges_total > 0 else torch.LongTensor([])
+    all_node_to_sample = torch.empty(n_rooms_total, dtype=torch.long)
+    all_edges_to_sample = torch.empty(n_edges_total, dtype=torch.long)
+
     node_offset = 0
-
+    edge_offset = 0
     for i, (rooms_mks, nodes, edges) in enumerate(batch):
-        O, T = nodes.size(0), edges.size(0)
+        n_nodes = len(nodes)
+        n_edges = len(edges)
 
-        all_rooms_mks.append(rooms_mks)
-        all_nodes.append(nodes)
-        edges = edges.clone()
+        all_rooms_mks[node_offset:node_offset + n_nodes] = rooms_mks
+        all_nodes[node_offset:node_offset + n_nodes] = nodes
+        all_edges[edge_offset:edge_offset + n_edges] = edges
+        all_node_to_sample[node_offset:node_offset + n_nodes] = torch.LongTensor(n_nodes).fill_(i)
+        all_edges_to_sample[edge_offset:edge_offset + n_edges] = torch.LongTensor(n_edges).fill_(i)
 
-        if edges.shape[0] > 0:
-            edges[:, 0] += node_offset
-            edges[:, 2] += node_offset
-            all_edges.append(edges)
+        all_edges[edge_offset:edge_offset + n_edges, 0] += node_offset
+        all_edges[edge_offset:edge_offset + n_edges, 2] += node_offset
 
-        all_node_to_sample.append(torch.LongTensor(O).fill_(i))
-        all_edge_to_sample.append(torch.LongTensor(T).fill_(i))
-        node_offset += O
+        node_offset += n_nodes
+        edge_offset += n_edges
 
-    all_rooms_mks = torch.cat(all_rooms_mks, 0)
-    all_nodes = torch.cat(all_nodes)
-    if len(all_edges) > 0:
-        all_edges = torch.cat(all_edges)
-    else:
-        all_edges = torch.tensor([])
-
-    all_node_to_sample = torch.cat(all_node_to_sample)
-    all_edge_to_sample = torch.cat(all_edge_to_sample)
-
-    return all_rooms_mks, all_nodes, all_edges, all_node_to_sample, all_edge_to_sample
+    return all_rooms_mks, all_nodes, all_edges, all_node_to_sample, all_edges_to_sample
 
 
-def create_loaders(path, train_batch_size, test_batch_size, loader_threads, n_rooms=(10, 12)):
+def create_loaders(path, train_batch_size=32, test_batch_size=64, loader_threads=8, n_rooms=(10, 12)):
     data = np.load(path, allow_pickle=True)
 
     # filter the data
@@ -139,11 +136,11 @@ def create_loaders(path, train_batch_size, test_batch_size, loader_threads, n_ro
         rooms_bbs = floorplan[1]  # bounding boxes
 
         # discard malformed samples
+        # TODO create a version of the dataset that is pre-cleaned
         if not rooms_types or any(i == 0 for i in rooms_types) or any(i is None for i in rooms_bbs):
             continue
 
         # discard small rooms
-        # TODO use del to drop elements from lists?
         types_filtered = []
         bbs_filtered = []
         for t, bb in zip(rooms_types, rooms_bbs):
@@ -165,9 +162,9 @@ def create_loaders(path, train_batch_size, test_batch_size, loader_threads, n_ro
 
     # create loaders
     train_loader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True, num_workers=loader_threads,
-                              collate_fn=floorplan_collate_fn)
+                              collate_fn=collate)
     test_loader = DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False, num_workers=loader_threads,
-                             collate_fn=floorplan_collate_fn)
+                             collate_fn=collate)
 
     return train_loader, test_loader
 
@@ -193,8 +190,9 @@ class FloorplanGraphDataset(Dataset):
             flip = random.randint(0, 1) == 1
             rooms_bbs = [self.augment_bounding_box(bb, angle, flip) for bb in rooms_bbs]
             # mutate per room or per floorplan for all rooms (like orig)??
-            # can I move angle/flip inside augment_bounding_box then?
-            #rooms_bbs = list(map(self.augment_bounding_box, rooms_bbs))
+            # can I move angle/flip inside augment_bounding_box() then?
+            # intuitively per room mutation seems better, TODO discuss this
+            # rooms_bbs = list(map(self.augment_bounding_box, rooms_bbs))
 
         rooms_bbs = np.stack(rooms_bbs) / IMAGE_SIZE_IN  # "normalize"
 
@@ -218,7 +216,7 @@ class FloorplanGraphDataset(Dataset):
             if rm > 0:
                 x0, y0, x1, y1 = IMAGE_SIZE_OUT * bb
                 x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
-                rooms_mks[k, x0:x1+1, y0:y1+1] = 1.0
+                rooms_mks[k, x0:x1 + 1, y0:y1 + 1] = 1.0
 
         nodes = torch.LongTensor(nodes)
         # onehot encode and drop class 0 because the rooms' classes are 1-10
@@ -228,7 +226,8 @@ class FloorplanGraphDataset(Dataset):
         edges = torch.LongTensor(edges)
 
         rooms_mks = torch.FloatTensor(rooms_mks)
-        normalize = transforms.Normalize(mean=[0.5], std=[0.5])
+        normalize = transforms.Normalize(mean=[0.5],
+                                         std=[0.5])  # basically transforms zeros to -1... don't know why this is useful
         rooms_mks = normalize(rooms_mks)
 
         return rooms_mks, nodes, edges
