@@ -8,8 +8,10 @@ from os.path import dirname, abspath, join
 
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
-from src.data import FloorplanGraphDataset
+from src.data import FloorplanGraphDataset, floorplan_collate_fn
+
 
 BASE_PATH = abspath(dirname(__file__))
 SEED = 10
@@ -35,6 +37,23 @@ class TestFloorplanGraphDataset(unittest.TestCase):
             self.assertTrue(torch.allclose(d[0], t[0]))
             self.assertTrue(torch.allclose(d[1], t[1]))
             self.assertTrue(torch.allclose(d[2], t[2]))
+
+    def test_collation(self):
+        mks_expected = torch.load(join(BASE_PATH, f'resources/mks1.pt'))
+        nds_expected = torch.load(join(BASE_PATH, f'resources/nds1.pt'))
+        eds_expected = torch.load(join(BASE_PATH, f'resources/eds1.pt'))
+        nd_to_sample_expected = torch.load(join(BASE_PATH, f'resources/nd_to_sample1.pt'))
+        ed_to_sample_expected = torch.load(join(BASE_PATH, f'resources/ed_to_sample1.pt'))
+
+        loader = DataLoader(self.dataset, batch_size=5, shuffle=False, num_workers=1, collate_fn=floorplan_collate_fn)
+
+        batch = next(iter(loader))
+        mks, nds, eds, nd_to_sample, ed_to_sample = batch
+        self.assertTrue(torch.allclose(mks, mks_expected))
+        self.assertTrue(torch.allclose(nds, nds_expected))
+        self.assertTrue(torch.allclose(eds, eds_expected))
+        self.assertTrue(torch.allclose(nd_to_sample, nd_to_sample_expected))
+        self.assertTrue(torch.allclose(ed_to_sample, ed_to_sample_expected))
 
 
 if __name__ == "__main__":
