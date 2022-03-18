@@ -71,7 +71,7 @@ Dataset collation:
   When the Dataset is loaded in batches, the collation function floorplan_collate_fn is called. This concatenates
   "vertically" (stacks) all the tensors that __getitem__ returns (so now we get tensors of sum(n_i) sizes,
   i={1 to batch size} and n_i the number of rooms in each floorplan of the batch, same with edges you get the idea),
-  and also returns two more tensors. __These two tensors are only used when training in parallel__.
+  and also returns two more tensors, which __are only used when training in parallel__.
   TODO elabolarate further here.
 """
 
@@ -207,23 +207,30 @@ class FloorplanGraphDataset(Dataset):
         rooms_bbs[:, :2] -= shift
         rooms_bbs[:, 2:] -= shift
 
-        # TODO revisit
-        nodes, edges = self.build_graph(rooms_bbs, rooms_type)
+        # create graph (nodes, edges)
+        edges = []
+        for k in range(len(rooms_type)):
+            for l in range(len(rooms_type)):
+                if l > k:
+                    nd0, bb0 = rooms_type[k], rooms_bbs[k]
+                    nd1, bb1 = rooms_type[l], rooms_bbs[l]
 
-        # TODO revisit
+                    if is_adjacent(bb0, bb1):
+                        edges.append([k, 1, l])
+                    else:
+                        edges.append([k, -1, l])
+
+        nodes = torch.LongTensor(list(map(int, rooms_type)))
+        edges = torch.LongTensor(edges)
         rooms_mks = np.zeros((len(nodes), IMAGE_SIZE_OUT, IMAGE_SIZE_OUT))
-        for k, (rm, bb) in enumerate(zip(nodes, rooms_bbs)):
-            if rm > 0:
-                x0, y0, x1, y1 = IMAGE_SIZE_OUT * bb
-                x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
-                rooms_mks[k, x0:x1 + 1, y0:y1 + 1] = 1.0
+        for k, bb in enumerate(rooms_bbs):
+            bb *= IMAGE_SIZE_OUT
+            x0, y0, x1, y1 = bb.astype(int)
+            rooms_mks[k, x0:x1 + 1, y0:y1 + 1] = 1.0
 
-        nodes = torch.LongTensor(nodes)
         # onehot encode and drop class 0 because the rooms' classes are 1-10
         nodes = one_hot(nodes, num_classes=11)[:, 1:]
         nodes = nodes.float()
-
-        edges = torch.LongTensor(edges)
 
         rooms_mks = torch.FloatTensor(rooms_mks)
         normalize = transforms.Normalize(mean=[0.5],
@@ -240,7 +247,7 @@ class FloorplanGraphDataset(Dataset):
         xmin, ymin = min(x0, x1), min(y0, y1)
         xmax, ymax = max(x0, x1), max(y0, y1)
 
-        return np.array([xmin, ymin, xmax, ymax]).astype('int')
+        return np.array([xmin, ymin, xmax, ymax]).astype(int)
 
     def flip_and_rotate(self, vector, flip, angle):
         image_bounds = np.array(self.image_shape)
@@ -262,25 +269,6 @@ class FloorplanGraphDataset(Dataset):
             x = mid - dist if x > mid else mid + dist
 
         return x, y
-
-    def build_graph(self, rooms_bbs, rooms_type):
-        # TODO revisit
-        edges = []
-        nodes = rooms_type
-        for k in range(len(nodes)):
-            for l in range(len(nodes)):
-                if l > k:
-                    nd0, bb0 = nodes[k], rooms_bbs[k]
-                    nd1, bb1 = nodes[l], rooms_bbs[l]
-
-                    if is_adjacent(bb0, bb1):
-                        edges.append([k, 1, l])
-                    else:
-                        edges.append([k, -1, l])
-
-        nodes = np.array(nodes)
-        edges = np.array(edges)
-        return nodes, edges
 
 
 def is_adjacent(box_a, box_b, threshold=ADJACENCY_THRESHOLD):
