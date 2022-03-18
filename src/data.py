@@ -51,7 +51,8 @@ Output schema:
     ```
     we get the following 3 tensors:
     1. https://imgur.com/a/HsQkeXg . The 1's are not in the exact locations of the starting bounding boxes because
-      when training, the data undergoes augmentation randomly (random flips and 90deg rotations of the rooms)
+      when training, the data undergoes augmentation randomly (random flips and multiples of 90deg rotations of the
+      rooms)
     2. ```
         tensor([[0., 0., 0., 0., 0., 1., 0., 0., 0., 0.],
                 [0., 1., 0., 0., 0., 0., 0., 0., 0., 0.],
