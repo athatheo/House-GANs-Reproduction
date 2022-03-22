@@ -134,3 +134,6 @@ data/
 # IDEs
 .idea/
 .vscode/
+
+# .npy files
+train_data.npy
