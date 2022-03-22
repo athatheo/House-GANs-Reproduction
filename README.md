@@ -11,3 +11,6 @@ Secondly, it is a project for the course [CS4240 Deep Learning](https://studiegi
 
 ### How to train
 1. Get the original data from [here](https://www.dropbox.com/sh/p707nojabzf0nhi/AAB4UPwW0EgHhbQuHyq60tCKa?dl=0)
+
+### Running tests
+Run `python -m unittest discover test`
