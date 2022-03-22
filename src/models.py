@@ -100,8 +100,8 @@ class Discriminator(Module):
     def add_pool(self, x, nd_to_sample):
         dtype, device = x.dtype, x.device
         batch_size = torch.max(nd_to_sample) + 1
-        pooled_x = torch.zeros(batch_size, x.shape[-1]).float().to(device)
-        pool_to = nd_to_sample.view(-1, 1).expand_as(x).to(device)
+        pooled_x = torch.zeros(batch_size, x.shape[-1], device=device).float()
+        pool_to = nd_to_sample.view(-1, 1).expand_as(x)
         pooled_x = pooled_x.scatter_add(0, pool_to, x)
         return pooled_x
 
