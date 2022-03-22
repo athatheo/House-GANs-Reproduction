@@ -13,3 +13,4 @@ args = parser.parse_args()
 
 train_loader, test_loader = create_loaders(args.data, args.train_batch_size, args.test_batch_size, args.loader_threads,
                                            n_rooms=(10, 12))
+## Make sure to load the data on device cuda
