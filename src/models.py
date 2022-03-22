@@ -18,8 +18,8 @@ class ConvMPN(Module):
         self.conv3 = Conv2d(in_channels=2*16, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=1)
 
     def get_nodes(self, feature_vectors, edges, include_neighbours=True):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        nodes = zeros_like(feature_vectors)
+        device = torch.cuda.current_device()#torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        nodes = zeros_like(feature_vectors, device=device)
         if include_neighbours:
             index = torch.where(edges[:, 1] > 0)
         else:
