@@ -5,6 +5,8 @@ from torch.autograd import Variable
 import torch.nn as nn
 from torchvision.utils import save_image
 
+import time
+
 import os
 
 from argparse import ArgumentParser
@@ -13,7 +15,7 @@ from data import create_loaders
 
 # Import the models
 from models import Discriminator, Generator
-# from utils import combine_images_maps
+from utils import combine_images_maps
 
 parser = ArgumentParser()
 parser.add_argument("--epochs", type=int, default=1000000, help="number of epochs of training")
@@ -23,7 +25,7 @@ parser.add_argument("--grad_updates", type=int, default=1, help="number of train
 parser.add_argument('--data', type=str, default='../data/train.npy', help='Training data path')
 parser.add_argument('--train-batch-size', type=int, default=32, help='Training batch size')
 parser.add_argument('--test-batch-size', type=int, default=64, help='Testing batch size')
-parser.add_argument('--loader-threads', type=int, default=4,
+parser.add_argument('--loader-threads', type=int, default=2,
                     help='Number of threads of the data loader')
 parser.add_argument("--target_set", type=str, default='A', help="which split to remove") # TODO
 args = parser.parse_args()
@@ -39,14 +41,13 @@ betas_dis = (0.5, 0.999)
 epochs = 1000000
 noise_dim = 128
 lambda_gp = 10
-sample_interval = 50000
+sample_interval = 1
 multi_gpu = False #True
 
 # Check for gpu
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 # Create folders to put result files and checkpoints
-exp_folder = "exp_" + args.target_set
+exp_folder = "exp2_" + args.target_set
 os.makedirs("./exps/" + exp_folder, exist_ok=True)
 os.makedirs("./checkpoints/", exist_ok=True)
 os.makedirs("./temp/", exist_ok=True)
@@ -61,26 +62,26 @@ opti_dis = torch.optim.Adam(discriminator.parameters(), lr=lr_dis, betas=betas_d
 Tensor = torch.FloatTensor
 
 # If there is a gpu, put everything in it
-if device == "cuda":
+if device.type == "cuda":
     generator.cuda()
     discriminator.cuda()
-    Tensor = torch.cuda.FloatTensor # TODO - LOOKS FINE!
-
-
+    Tensor = torch.cuda.FloatTensor
+    
 def graph_scatter(inputs, device_ids, indices): # TODO - revisit
     nds_to_sample, eds_to_sample = indices
 
-    # new implementation # TODO - check if it's working TEST
-    # batch_size = (torch.max(nds_to_sample) + 1).detach()
-    # N = len(device_ids)
-    # shift = torch.round(torch.linspace(0, batch_size, N)).numpy()
-    # shift = torch.cat((shift,torch.Tensor([batch_size])))
+    start = time.time()
+    # new implementation
+    batch_size = (torch.max(nds_to_sample) + 1).detach()
+    N = len(device_ids)
+    shift = torch.round(torch.linspace(0, batch_size, N+1))[:-1]
+    shift = torch.cat((shift,torch.Tensor([batch_size])))
 
     # old implementation
-    batch_size = (torch.max(nds_to_sample) + 1).detach().cpu().numpy()
-    N = len(device_ids)
-    shift = np.round(np.linspace(0, batch_size, N, endpoint=False)).astype(int)
-    shift = list(shift) + [int(batch_size)]
+    # batch_size = (torch.max(nds_to_sample) + 1).detach().cpu().numpy()
+    # N = len(device_ids)
+    # shift = np.round(np.linspace(0, batch_size, N, endpoint=False)).astype(int)
+    # shift = list(shift) + [int(batch_size)]
 
     outputs = []
     for i in range(len(device_ids)):
@@ -123,30 +124,30 @@ def data_parallel(module, _input, indices): # TODO - revisit
 
 
 # TODO - Visualize a single batch - TEST
-# def visualizeSingleBatch(test_loader, args, batches_done):
-#     with torch.no_grad():
-#         # Unpack batch
-#         masks, nds, eds, nds_to_sample, eds_to_sample = next(iter(test_loader))
-#         real_masks = Variable(masks.type(Tensor))
-#         given_nds = Variable(nds.type(Tensor))
-#         given_eds = eds
-#
-#         # Generate a batch of images
-#         z = Variable(Tensor(np.random.normal(0, 1, (given_nds.shape[0], noise_dim))))
-#         gen_masks = generator(z, given_nds, given_eds)
-#
-#         # Generate image tensors
-#         # real_imgs_tensor = combine_images_maps(real_masks, given_nds, given_eds,
-#         #                                        nds_to_sample, eds_to_sample)
-#         # fake_imgs_tensor = combine_images_maps(gen_masks, given_nds, given_eds,
-#         #                                        nds_to_sample, eds_to_sample)
-#
-#         # Save images
-#         save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done),
-#                    nrow=12, normalize=False)
-#         save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done),
-#                    nrow=12, normalize=False)
-#     return
+def visualizeSingleBatch(test_loader, args, batches_done):
+    with torch.no_grad():
+        # Unpack batch
+        masks, nds, eds, nds_to_sample, eds_to_sample = next(iter(test_loader))
+        real_masks = Variable(masks.type(Tensor))
+        given_nds = Variable(nds.type(Tensor))
+        given_eds = eds
+
+        # Generate a batch of images
+        z = Variable(Tensor(np.random.normal(0, 1, (given_nds.shape[0], noise_dim))))
+        gen_masks = generator(z, given_nds, given_eds)
+
+        # Generate image tensors
+        real_imgs_tensor = combine_images_maps(real_masks, given_nds, given_eds,
+                                               nds_to_sample, eds_to_sample)
+        fake_imgs_tensor = combine_images_maps(gen_masks, given_nds, given_eds,
+                                               nds_to_sample, eds_to_sample)
+
+        # Save images
+        save_image(real_imgs_tensor, "./exps/{}/{}_real.png".format(exp_folder, batches_done),
+                   nrow=12, normalize=False)
+        save_image(fake_imgs_tensor, "./exps/{}/{}_fake.png".format(exp_folder, batches_done),
+                   nrow=12, normalize=False)
+    return
 
 
 # Load train and test data
@@ -156,21 +157,19 @@ train_loader, test_loader = create_loaders(args.data, args.train_batch_size, arg
 def compute_gradient_penalty(dis, real, fake, given_nds=None, given_eds=None, indices=None,
                              data_parallel=None):
     batch_size = torch.max(nds_to_sample) + 1
-    dtype, device = real.dtype, real.device
-    alpha = torch.FloatTensor(real.shape[0], 1, 1).to(device)
-    alpha.data.resize_(real.shape[0], 1, 1)
-    alpha.uniform_(0, 1)
+    # old implementation
+    # dtype, device = real.dtype, real.device
+    # alpha = torch.FloatTensor(real.shape[0], 1, 1).to(device)
+    # alpha.uniform_(0, 1)
 
-    # TODO - what about these instead of the above? TEST
-    # batch_size, C, L = real.shape
-    # alpha = torch.rand((batch_size, 1, 1)).repeat(1, C, L)
+    # new implementation
+    alpha = torch.rand((real.shape[0], 1, 1)).to(device)
 
     x_both = real.data * alpha + fake.data * (1 - alpha)
     x_both = x_both.to(device)
     x_both = Variable(x_both, requires_grad=True)
     grad_outputs = torch.ones(batch_size, 1).to(device)
-    # TODO - why not the below? TEST
-    # grad_outputs = torch.ones_like(x_both)
+
     if data_parallel:
         dis_out = data_parallel(dis, (x_both, given_nds, given_eds, indices[0]), indices)
     else:
@@ -181,26 +180,23 @@ def compute_gradient_penalty(dis, real, fake, given_nds=None, given_eds=None, in
                                retain_graph=True,
                                create_graph=True,
                                only_inputs=True)[0]
-    gradient_penalty = ((grad.norm(2, 1).norm(2, 1) - 1) ** 2).mean()
-    # TODO - Why not the below lines? TEST
-    # gradient = grad.view(grad.shape[0], -1)
-    # gradient_norm = gradient.norm(2, dim=1)
-    # gradient_penalty = torch.mean((gradient_norm - 1) ** 2)
-
+    # old implementation
+    # gradient_penalty = ((grad.norm(2, 1).norm(2, 1) - 1) ** 2).mean()
+    
+    # new implementation
+    gradient = grad.view(grad.shape[0], -1)
+    gradient_norm = gradient.norm(2, dim=1)
+    gradient_penalty = torch.mean((gradient_norm - 1) ** 2)
+    
     return gradient_penalty
-
 
 # Training
 for epoch in range(args.epochs):
     for idx, minibatch in enumerate(train_loader):
-
         # Unpack the minibatch
         masks, nds, eds, nds_to_sample, eds_to_sample = minibatch
         indices = nds_to_sample, eds_to_sample
-        # TODO : What happens with nds_to_sample, eds_to_sample
 
-        # Configure input types and namings
-        # TODO - update names
         real_masks = Variable(masks.type(Tensor))
         given_nds = Variable(nds.type(Tensor))
         given_eds = eds
@@ -270,29 +266,19 @@ for epoch in range(args.epochs):
         opti_gen.zero_grad()
 
         # TODO - Here, a new mask is generated from the generator network! Why does this happen??
-        # Also, no parallel
         # Commenting out for now
         # Generate a batch of images
         # z = Variable(Tensor(np.random.normal(0, 1, (given_nds.shape[0], noise_dim))))
         # gen_masks = generator(z, given_nds, given_eds)
-        #
-        # # Score fake images
-        # if multi_gpu:
-        #     fake_validity = data_parallel(discriminator, \
-        #                                   (gen_masks, given_nds, \
-        #                                    given_eds, nds_to_sample), \
-        #                                   indices)
-        # else:
-        #     fake_validity = discriminator(gen_masks, given_nds, given_eds, nds_to_sample)
-
-        # TODO - If the above is redundant, then this is relevant
+        
+        # Score fake images
         if multi_gpu:
-            eval_fake = data_parallel(discriminator,
-                                          (gen_masks., given_nds,
-                                           given_eds, nds_to_sample), indices)
+            eval_fake = data_parallel(discriminator, \
+                                          (gen_masks, given_nds, \
+                                           given_eds, nds_to_sample), \
+                                          indices)
         else:
-            eval_fake = discriminator(gen_masks, given_nds, given_eds,
-                                      nds_to_sample)
+            eval_fake = discriminator(gen_masks, given_nds, given_eds, nds_to_sample)
 
         # Compute the generator loss
         gen_loss = -torch.mean(eval_fake)
@@ -309,5 +295,5 @@ for epoch in range(args.epochs):
         if (batches_done % sample_interval == 0) and batches_done:
             torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder,
                                                                                 batches_done))
-            # visualizeSingleBatch(test_loader, args, batches_done)
+            visualizeSingleBatch(test_loader, args, batches_done)
         batches_done += args.grad_updates
