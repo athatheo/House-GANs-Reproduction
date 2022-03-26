@@ -112,12 +112,13 @@ def collate(batch):
 
         all_rooms_mks[node_offset:node_offset + n_nodes] = rooms_mks
         all_nodes[node_offset:node_offset + n_nodes] = nodes
-        all_edges[edge_offset:edge_offset + n_edges] = edges
+        if edges.shape[0] > 0:
+            all_edges[edge_offset:edge_offset + n_edges] = edges
+            all_edges[edge_offset:edge_offset + n_edges, 0] += node_offset
+            all_edges[edge_offset:edge_offset + n_edges, 2] += node_offset
         all_node_to_sample[node_offset:node_offset + n_nodes] = torch.LongTensor(n_nodes).fill_(i)
         all_edges_to_sample[edge_offset:edge_offset + n_edges] = torch.LongTensor(n_edges).fill_(i)
 
-        all_edges[edge_offset:edge_offset + n_edges, 0] += node_offset
-        all_edges[edge_offset:edge_offset + n_edges, 2] += node_offset
 
         node_offset += n_nodes
         edge_offset += n_edges
@@ -157,7 +158,7 @@ def create_loaders(path, train_batch_size=32, test_batch_size=64, loader_threads
             train_data.append([types_filtered, bbs_filtered])
 
     # create datasets
-    train_dataset = FloorplanGraphDataset(train_data[:10], augment=True)
+    train_dataset = FloorplanGraphDataset(train_data, augment=True)
     test_dataset = FloorplanGraphDataset(test_data)
 
     # create loaders
