@@ -157,7 +157,7 @@ def create_loaders(path, train_batch_size=32, test_batch_size=64, loader_threads
             train_data.append([types_filtered, bbs_filtered])
 
     # create datasets
-    train_dataset = FloorplanGraphDataset(train_data, augment=True)
+    train_dataset = FloorplanGraphDataset(train_data[:10], augment=True)
     test_dataset = FloorplanGraphDataset(test_data)
 
     # create loaders

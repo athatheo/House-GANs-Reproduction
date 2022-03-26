@@ -226,7 +226,7 @@ for epoch in range(args.epochs):
                                           (real_masks, given_nds,
                                            given_eds, nds_to_sample), indices)
         else:
-            eval_real = discriminator(real_masks, given_nds, given_eds, indices)
+            eval_real = discriminator(real_masks, given_nds, given_eds, nds_to_sample)
 
         # Generated images
         if multi_gpu:
@@ -257,7 +257,7 @@ for epoch in range(args.epochs):
         dis_loss = - torch.mean(eval_real) + torch.mean(eval_fake) + lambda_gp * gradient_penalty
 
         # Update the discriminator weights and perform one step in the optimizer
-        discriminator.backward()
+        dis_loss.backward()
         opti_dis.step()
 
         # Set grads off
@@ -288,17 +288,17 @@ for epoch in range(args.epochs):
         # TODO - If the above is redundant, then this is relevant
         if multi_gpu:
             eval_fake = data_parallel(discriminator,
-                                          (gen_masks.detach(), given_nds.detach(),
-                                           given_eds.detach(), nds_to_sample.detach()), indices)
+                                          (gen_masks., given_nds,
+                                           given_eds, nds_to_sample), indices)
         else:
-            eval_real = discriminator(gen_masks.detach(), given_nds.detach(), given_eds.detach(),
-                                      nds_to_sample.detach())
+            eval_fake = discriminator(gen_masks, given_nds, given_eds,
+                                      nds_to_sample)
 
         # Compute the generator loss
         gen_loss = -torch.mean(eval_fake)
 
         # Update the generator weights and perform one step in the optimizer
-        generator.backward()
+        gen_loss.backward()
         opti_gen.step()
 
         print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
