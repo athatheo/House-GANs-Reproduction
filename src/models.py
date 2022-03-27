@@ -18,7 +18,7 @@ class ConvMPN(Module):
         self.conv3 = Conv2d(in_channels=2*16, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=1)
 
     def get_nodes(self, feature_vectors, edges, include_neighbours=True):
-        device = torch.cuda.current_device()#torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = feature_vectors.device
         nodes = zeros_like(feature_vectors, device=device)
         if include_neighbours:
             index = torch.where(edges[:, 1] > 0)
@@ -28,7 +28,7 @@ class ConvMPN(Module):
         src = torch.cat([edges[index[0], 0], edges[index[0], 2]]).long()
         dst = torch.cat([edges[index[0], 2], edges[index[0], 0]]).long()
         src = feature_vectors[src.contiguous()]
-        dst = dst.view(-1, 1, 1, 1).expand_as(src)
+        dst = dst.view(-1, 1, 1, 1).expand_as(src).to(device)
         return nodes.scatter_add(0, dst, src)
 
     def cat_nodes(self, feature_vectors, edges):
@@ -101,7 +101,7 @@ class Discriminator(Module):
         dtype, device = x.dtype, x.device
         batch_size = torch.max(nd_to_sample) + 1
         pooled_x = torch.zeros(batch_size, x.shape[-1], device=device).float()
-        pool_to = nd_to_sample.view(-1, 1).expand_as(x)
+        pool_to = nd_to_sample.view(-1, 1).expand_as(x).to(device)
         pooled_x = pooled_x.scatter_add(0, pool_to, x)
         return pooled_x
 

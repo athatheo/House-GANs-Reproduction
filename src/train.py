@@ -61,7 +61,7 @@ opti_dis = torch.optim.Adam(discriminator.parameters(), lr=lr_dis, betas=betas_d
 Tensor = torch.FloatTensor
 
 # If there is a gpu, put everything in it
-if device == "cuda":
+if torch.cuda.is_available():
     generator.cuda()
     discriminator.cuda()
     Tensor = torch.cuda.FloatTensor # TODO - LOOKS FINE!
@@ -288,7 +288,7 @@ for epoch in range(args.epochs):
         # TODO - If the above is redundant, then this is relevant
         if multi_gpu:
             eval_fake = data_parallel(discriminator,
-                                          (gen_masks., given_nds,
+                                          (gen_masks, given_nds,
                                            given_eds, nds_to_sample), indices)
         else:
             eval_fake = discriminator(gen_masks, given_nds, given_eds,
@@ -301,13 +301,18 @@ for epoch in range(args.epochs):
         gen_loss.backward()
         opti_gen.step()
 
-        print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
+        if idx%500 == 0:
+            print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
               % (epoch, args.epochs, idx, len(train_loader), dis_loss.item(), gen_loss.item()))
 
         # Save a checkpoint, if the epoch is over
         batches_done = epoch * len(train_loader) + idx
+
         if (batches_done % sample_interval == 0) and batches_done:
             torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder,
                                                                                 batches_done))
             # visualizeSingleBatch(test_loader, args, batches_done)
         batches_done += args.grad_updates
+
+torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder,
+                                                                    batches_done))
