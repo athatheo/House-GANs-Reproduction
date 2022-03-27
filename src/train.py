@@ -5,8 +5,6 @@ from torch.autograd import Variable
 import torch.nn as nn
 from torchvision.utils import save_image
 
-import time
-
 import os
 
 from argparse import ArgumentParser
@@ -25,7 +23,7 @@ parser.add_argument("--grad_updates", type=int, default=1, help="number of train
 parser.add_argument('--data', type=str, default='../data/train.npy', help='Training data path')
 parser.add_argument('--train-batch-size', type=int, default=32, help='Training batch size')
 parser.add_argument('--test-batch-size', type=int, default=64, help='Testing batch size')
-parser.add_argument('--loader-threads', type=int, default=2,
+parser.add_argument('--loader-threads', type=int, default=4,
                     help='Number of threads of the data loader')
 parser.add_argument("--target_set", type=str, default='A', help="which split to remove") # TODO
 args = parser.parse_args()
@@ -47,7 +45,7 @@ multi_gpu = False #True
 # Check for gpu
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Create folders to put result files and checkpoints
-exp_folder = "exp2_" + args.target_set
+exp_folder = "exp_" + args.target_set
 os.makedirs("./exps/" + exp_folder, exist_ok=True)
 os.makedirs("./checkpoints/", exist_ok=True)
 os.makedirs("./temp/", exist_ok=True)
@@ -62,7 +60,11 @@ opti_dis = torch.optim.Adam(discriminator.parameters(), lr=lr_dis, betas=betas_d
 Tensor = torch.FloatTensor
 
 # If there is a gpu, put everything in it
+<<<<<<< HEAD
 if device.type == "cuda":
+=======
+if torch.cuda.is_available():
+>>>>>>> 7655b1d891a7fa1a9e966e0fc0773a3141b1d524
     generator.cuda()
     discriminator.cuda()
     Tensor = torch.cuda.FloatTensor
@@ -273,10 +275,9 @@ for epoch in range(args.epochs):
         
         # Score fake images
         if multi_gpu:
-            eval_fake = data_parallel(discriminator, \
-                                          (gen_masks, given_nds, \
-                                           given_eds, nds_to_sample), \
-                                          indices)
+            eval_fake = data_parallel(discriminator,
+                                          (gen_masks, given_nds,
+                                           given_eds, nds_to_sample), indices)
         else:
             eval_fake = discriminator(gen_masks, given_nds, given_eds, nds_to_sample)
 
@@ -287,13 +288,18 @@ for epoch in range(args.epochs):
         gen_loss.backward()
         opti_gen.step()
 
-        print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
+        if idx%500 == 0:
+            print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
               % (epoch, args.epochs, idx, len(train_loader), dis_loss.item(), gen_loss.item()))
 
         # Save a checkpoint, if the epoch is over
         batches_done = epoch * len(train_loader) + idx
+
         if (batches_done % sample_interval == 0) and batches_done:
             torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder,
                                                                                 batches_done))
             visualizeSingleBatch(test_loader, args, batches_done)
         batches_done += args.grad_updates
+
+torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder,
+                                                                    batches_done))
