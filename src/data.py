@@ -119,10 +119,6 @@ def collate(batch):
         all_node_to_sample[node_offset:node_offset + n_nodes] = torch.LongTensor(n_nodes).fill_(i)
         all_edges_to_sample[edge_offset:edge_offset + n_edges] = torch.LongTensor(n_edges).fill_(i)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> e3ebb75bf464efc48cdfa3b20df7ecec24351d15
 
         node_offset += n_nodes
         edge_offset += n_edges
