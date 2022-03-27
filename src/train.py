@@ -60,11 +60,7 @@ opti_dis = torch.optim.Adam(discriminator.parameters(), lr=lr_dis, betas=betas_d
 Tensor = torch.FloatTensor
 
 # If there is a gpu, put everything in it
-<<<<<<< HEAD
 if device.type == "cuda":
-=======
-if torch.cuda.is_available():
->>>>>>> 7655b1d891a7fa1a9e966e0fc0773a3141b1d524
     generator.cuda()
     discriminator.cuda()
     Tensor = torch.cuda.FloatTensor
