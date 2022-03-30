@@ -69,7 +69,6 @@ if torch.cuda.is_available():
 def graph_scatter(inputs, device_ids, indices): # TODO - revisit
     nds_to_sample, eds_to_sample = indices
 
-    start = time.time()
     # new implementation
     batch_size = (torch.max(nds_to_sample) + 1).detach()
     N = len(device_ids)
