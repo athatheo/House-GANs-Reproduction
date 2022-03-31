@@ -16,6 +16,7 @@ class ConvMPN(Module):
         self.conv1 = Conv2d(in_channels=3*16, out_channels=2*16, kernel_size=(3, 3), stride=(1, 1), padding=1)
         self.conv2 = Conv2d(in_channels=2*16, out_channels=2*16, kernel_size=(3, 3), stride=(1, 1), padding=1)
         self.conv3 = Conv2d(in_channels=2*16, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=1)
+        self.leaky_relu = LeakyReLU(0.1)
 
     def get_nodes(self, feature_vectors, edges, include_neighbours=True):
         device = feature_vectors.device
@@ -41,8 +42,11 @@ class ConvMPN(Module):
     def forward(self, x, edges):
         x = self.cat_nodes(x, edges)
         x = self.conv1(x)
+        x = self.leaky_relu(x)
         x = self.conv2(x)
+        x = self.leaky_relu(x)
         x = self.conv3(x)
+        x = self.leaky_relu(x)
         return x
 
 

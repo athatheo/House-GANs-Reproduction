@@ -16,16 +16,16 @@ from models import Discriminator, Generator
 from utils import combine_images_maps
 
 parser = ArgumentParser()
-parser.add_argument("--epochs", type=int, default=1000000, help="number of epochs of training")
+parser.add_argument("--epochs", type=int, default=50, help="number of epochs of training")
 parser.add_argument("--grad_updates", type=int, default=1, help="number of training steps for "
-                                                            "discriminator per iter")
+                                                                "discriminator per iter")
 
-parser.add_argument('--data', type=str, default='../data/train.npy', help='Training data path')
+parser.add_argument('--data', type=str, default='../train_data.npy', help='Training data path')
 parser.add_argument('--train-batch-size', type=int, default=32, help='Training batch size')
 parser.add_argument('--test-batch-size', type=int, default=64, help='Testing batch size')
 parser.add_argument('--loader-threads', type=int, default=4,
                     help='Number of threads of the data loader')
-parser.add_argument("--target_set", type=str, default='A', help="which split to remove") # TODO
+parser.add_argument("--target_set", type=str, default='D', help="which split to remove") # TODO
 args = parser.parse_args()
 
 # set important training parameters
@@ -36,11 +36,11 @@ betas_gen = (0.5, 0.999)
 lr_dis = 0.0001
 betas_dis = (0.5, 0.999)
 # training
-epochs = 1000000
+epochs = 50
 noise_dim = 128
 lambda_gp = 10
-sample_interval = 1
-multi_gpu = False #True
+sample_interval = 50000
+multi_gpu = True
 
 # Check for gpu
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -65,10 +65,9 @@ if device.type == "cuda":
     discriminator.cuda()
     Tensor = torch.cuda.FloatTensor
     
-def graph_scatter(inputs, device_ids, indices): # TODO - revisit
+def graph_scatter(inputs, device_ids, indices):
     nds_to_sample, eds_to_sample = indices
 
-    start = time.time()
     # new implementation
     batch_size = (torch.max(nds_to_sample) + 1).detach()
     N = len(device_ids)
@@ -111,7 +110,7 @@ def graph_scatter(inputs, device_ids, indices): # TODO - revisit
     return outputs
 
 
-def data_parallel(module, _input, indices): # TODO - revisit
+def data_parallel(module, _input, indices):
     device_ids = list(range(torch.cuda.device_count()))
     output_device = device_ids[0]
     replicas = nn.parallel.replicate(module, device_ids)
@@ -121,7 +120,7 @@ def data_parallel(module, _input, indices): # TODO - revisit
     return nn.parallel.gather(outputs, output_device)
 
 
-# TODO - Visualize a single batch - TEST
+# Visualize a single batch
 def visualizeSingleBatch(test_loader, args, batches_done):
     with torch.no_grad():
         # Unpack batch
@@ -189,6 +188,8 @@ def compute_gradient_penalty(dis, real, fake, given_nds=None, given_eds=None, in
     return gradient_penalty
 
 # Training
+gen_loss_array = []
+disc_loss_array = []
 for epoch in range(args.epochs):
     for idx, minibatch in enumerate(train_loader):
         # Unpack the minibatch
@@ -249,6 +250,7 @@ for epoch in range(args.epochs):
 
         # Compute the discriminator loss with gradient penalty
         dis_loss = - torch.mean(eval_real) + torch.mean(eval_fake) + lambda_gp * gradient_penalty
+        disc_loss_array.append(dis_loss.item())
 
         # Update the discriminator weights and perform one step in the optimizer
         dis_loss.backward()
@@ -279,23 +281,32 @@ for epoch in range(args.epochs):
 
         # Compute the generator loss
         gen_loss = -torch.mean(eval_fake)
+        gen_loss_array.append(gen_loss.item())
 
         # Update the generator weights and perform one step in the optimizer
         gen_loss.backward()
         opti_gen.step()
-
-        if idx%500 == 0:
-            print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-              % (epoch, args.epochs, idx, len(train_loader), dis_loss.item(), gen_loss.item()))
-
         # Save a checkpoint, if the epoch is over
         batches_done = epoch * len(train_loader) + idx
+        if idx%500 == 0:
+            print("[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
+                  % (epoch, args.epochs, idx, len(train_loader), dis_loss.item(), gen_loss.item()))
 
-        if (batches_done % sample_interval == 0) and batches_done:
-            torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder,
-                                                                                batches_done))
+        if idx%3000 == 0 and idx != 0:
+            visualizeSingleBatch(test_loader, args, batches_done)
+
+
+        if (batches_done % sample_interval == 0):
+            torch.save({'gen_state_dict': generator.state_dict(),
+                        'disc_state_dict': discriminator.state_dict(),
+                        'gen_loss': gen_loss_array,
+                        'disc_loss': disc_loss_array,
+                        }, './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
             visualizeSingleBatch(test_loader, args, batches_done)
         batches_done += args.grad_updates
 
-torch.save(generator.state_dict(), './checkpoints/{}_{}.pth'.format(exp_folder,
-                                                                    batches_done))
+torch.save({'gen_state_dict': generator.state_dict(),
+            'disc_state_dict': discriminator.state_dict(),
+            'gen_loss': gen_loss_array,
+            'disc_loss': disc_loss_array,
+            }, './checkpoints/{}_{}.pth'.format(exp_folder, batches_done))
