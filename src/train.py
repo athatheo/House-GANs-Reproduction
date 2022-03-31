@@ -25,7 +25,7 @@ parser.add_argument('--train-batch-size', type=int, default=32, help='Training b
 parser.add_argument('--test-batch-size', type=int, default=64, help='Testing batch size')
 parser.add_argument('--loader-threads', type=int, default=4,
                     help='Number of threads of the data loader')
-parser.add_argument("--target_set", type=str, default='D', help="which split to remove") # TODO
+parser.add_argument("--target_set", type=str, default='D', help="which split to remove")
 args = parser.parse_args()
 
 # set important training parameters
