@@ -148,13 +148,14 @@ def create_loaders(path, train_batch_size=32, test_batch_size=64, loader_threads
                 types_filtered.append(t)
                 bbs_filtered.append(bb)
 
-        # trainset has samples outside the target range for number of rooms, and testset only those inside (?)
-        # also cap the number of eval samples to 5k for some reason
-        # TODO remove this stupid 5k limit here after confirming that all is ok without it
-        if n_rooms[0] <= len(rooms_types) <= n_rooms[1] and len(train_data) <= 5000:
+        # trainset has samples outside the target range for number of rooms, and testset only those inside
+        if n_rooms[0] <= len(rooms_types) <= n_rooms[1]:
             test_data.append([types_filtered, bbs_filtered])
         else:
             train_data.append([types_filtered, bbs_filtered])
+
+        # cap the number of eval samples to 5k
+        test_data = test_data[:5000]
 
     # create datasets
     train_dataset = FloorplanGraphDataset(train_data, augment=True)
