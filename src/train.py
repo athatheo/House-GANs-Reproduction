@@ -74,12 +74,6 @@ def graph_scatter(inputs, device_ids, indices):
     shift = torch.round(torch.linspace(0, batch_size, N+1))[:-1]
     shift = torch.cat((shift,torch.Tensor([batch_size])))
 
-    # old implementation
-    # batch_size = (torch.max(nds_to_sample) + 1).detach().cpu().numpy()
-    # N = len(device_ids)
-    # shift = np.round(np.linspace(0, batch_size, N, endpoint=False)).astype(int)
-    # shift = list(shift) + [int(batch_size)]
-
     outputs = []
     for i in range(len(device_ids)):
         if len(inputs) <= 3:
@@ -154,12 +148,7 @@ train_loader, test_loader = create_loaders(args.data, args.train_batch_size, arg
 def compute_gradient_penalty(dis, real, fake, given_nds=None, given_eds=None, indices=None,
                              data_parallel=None):
     batch_size = torch.max(nds_to_sample) + 1
-    # old implementation
-    # dtype, device = real.dtype, real.device
-    # alpha = torch.FloatTensor(real.shape[0], 1, 1).to(device)
-    # alpha.uniform_(0, 1)
 
-    # new implementation
     alpha = torch.rand((real.shape[0], 1, 1)).to(device)
 
     x_both = real.data * alpha + fake.data * (1 - alpha)
@@ -177,10 +166,7 @@ def compute_gradient_penalty(dis, real, fake, given_nds=None, given_eds=None, in
                                retain_graph=True,
                                create_graph=True,
                                only_inputs=True)[0]
-    # old implementation
-    # gradient_penalty = ((grad.norm(2, 1).norm(2, 1) - 1) ** 2).mean()
-    
-    # new implementation
+
     gradient = grad.view(grad.shape[0], -1)
     gradient_norm = gradient.norm(2, dim=1)
     gradient_penalty = torch.mean((gradient_norm - 1) ** 2)
@@ -265,12 +251,6 @@ for epoch in range(args.epochs):
         # ==========================================================================================
         opti_gen.zero_grad()
 
-        # TODO - Here, a new mask is generated from the generator network! Why does this happen??
-        # Commenting out for now
-        # Generate a batch of images
-        # z = Variable(Tensor(np.random.normal(0, 1, (given_nds.shape[0], noise_dim))))
-        # gen_masks = generator(z, given_nds, given_eds)
-        
         # Score fake images
         if multi_gpu:
             eval_fake = data_parallel(discriminator,
