@@ -190,10 +190,6 @@ class FloorplanGraphDataset(Dataset):
             angle = random.randint(0, 3) * 90.0
             flip = random.randint(0, 1) == 1
             rooms_bbs = [self.augment_bounding_box(bb, angle, flip) for bb in rooms_bbs]
-            # mutate per room or per floorplan for all rooms (like orig)??
-            # can I move angle/flip inside augment_bounding_box() then?
-            # intuitively per room mutation seems better, TODO discuss this
-            # rooms_bbs = list(map(self.augment_bounding_box, rooms_bbs))
 
         rooms_bbs = np.stack(rooms_bbs) / IMAGE_SIZE_IN  # "normalize"
 
