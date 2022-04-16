@@ -20,3 +20,11 @@ The original author defines one epoch as one pass on the whole dataset and as it
 
 ### Running tests
 Run `python -m unittest discover test`
+
+### Evaluation
+In order to evaluate diversity, the FID score from https://github.com/mseitzer/pytorch-fid is used. One way to calculate the FID score is to generate on esample for each graph (5k fake) and compare it with the corrresponding GT (5k real).
+So in order to evaluate all 5 metrics provided, to evaluate fro each group the model should be trained with the data of the other groups. Ex. to evaluate 1-3, we need to train a model on 4-6, 7-9, 10-12, 13+.
+1. Set correct data path on Argument parser of compute_FID.py
+2. Set correct checkpoint path
+3. run compute_FID.py
+4. use https://github.com/mseitzer/pytorch-fid to calculate FID providing the two folder paths created from compute_FID.pu
