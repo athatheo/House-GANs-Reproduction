@@ -27,4 +27,4 @@ So in order to evaluate all 5 metrics provided, to evaluate fro each group the m
 1. Set correct data path on Argument parser of compute_FID.py
 2. Set correct checkpoint path
 3. run compute_FID.py
-4. use https://github.com/mseitzer/pytorch-fid to calculate FID providing the two folder paths created from compute_FID.pu
+4. use https://github.com/mseitzer/pytorch-fid to calculate FID providing the two folder paths created from compute_FID.py
